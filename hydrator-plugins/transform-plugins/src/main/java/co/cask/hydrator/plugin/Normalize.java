@@ -65,6 +65,9 @@ public class Normalize extends Transform<StructuredRecord, StructuredRecord> {
   }
 
   private void createOutputSchema() {
+    if (outputSchema != null) {
+      return;
+    }
     //create output schema
     List<Schema.Field> outputFields = Lists.newArrayList();
     mappingFieldMap = new HashMap<String, String>();
@@ -83,23 +86,22 @@ public class Normalize extends Transform<StructuredRecord, StructuredRecord> {
 
     //Type and Value mapping for all normalize fields must be same, otherwise it is invalid.
     //read type and value from first normalize fields which is used for validation.
-    List<String> validTypeValueFieldList = Lists.newArrayList();
     String[] typeValueFields = fieldNormalizingArray[0].split(":");
-    validTypeValueFieldList.add(typeValueFields[1]);
-    validTypeValueFieldList.add(typeValueFields[2]);
+    String validTypeField = typeValueFields[1];
+    String validValueField = typeValueFields[2];
 
     for (String fieldNormalizing : fieldNormalizingArray) {
       String[] fields = fieldNormalizing.split(":");
-      Preconditions.checkArgument(validTypeValueFieldList.contains(fields[1]), "Type mapping is invalid for " +
+      Preconditions.checkArgument(validTypeField.equals(fields[1]), "Type mapping is invalid for " +
         "normalize field '" + fields[0] + "'. It must be same for all normalize fields.");
-      Preconditions.checkArgument(validTypeValueFieldList.contains(fields[2]), "Value mapping is invalid for " +
+      Preconditions.checkArgument(validValueField.equals(fields[2]), "Value mapping is invalid for " +
         "normalize field '" + fields[0] + "'. It must be same for all normalize fields.");
       normalizeFieldList.add(fields[0]);
       normalizeFieldMap.put(fields[0] + NAME_KEY_SUFFIX, fields[1]);
       normalizeFieldMap.put(fields[0] + VALUE_KEY_SUFFIX, fields[2]);
-      outputFields.add(Schema.Field.of(fields[1], Schema.of(Schema.Type.STRING)));
-      outputFields.add(Schema.Field.of(fields[2], Schema.of(Schema.Type.STRING)));
     }
+    outputFields.add(Schema.Field.of(validTypeField, Schema.of(Schema.Type.STRING)));
+    outputFields.add(Schema.Field.of(validValueField, Schema.of(Schema.Type.STRING)));
     outputSchema = Schema.recordOf("outputSchema", outputFields);
   }
 
