@@ -18,17 +18,14 @@ package co.cask.hydrator.plugin;
 
 import co.cask.cdap.api.data.format.StructuredRecord;
 import co.cask.cdap.api.data.schema.Schema;
-import co.cask.cdap.api.dataset.lib.KeyValueTable;
 import co.cask.cdap.api.dataset.table.Table;
 import co.cask.cdap.etl.api.Transform;
-import co.cask.cdap.etl.api.batch.BatchSource;
 import co.cask.cdap.etl.batch.mapreduce.ETLMapReduce;
 import co.cask.cdap.etl.mock.batch.MockSink;
 import co.cask.cdap.etl.mock.batch.MockSource;
 import co.cask.cdap.etl.proto.v2.ETLBatchConfig;
 import co.cask.cdap.etl.proto.v2.ETLPlugin;
 import co.cask.cdap.etl.proto.v2.ETLStage;
-import co.cask.cdap.proto.Id;
 import co.cask.cdap.proto.artifact.AppRequest;
 import co.cask.cdap.proto.id.ApplicationId;
 import co.cask.cdap.proto.id.NamespaceId;
@@ -36,13 +33,11 @@ import co.cask.cdap.test.ApplicationManager;
 import co.cask.cdap.test.DataSetManager;
 import co.cask.cdap.test.MapReduceManager;
 import co.cask.hydrator.common.MockPipelineConfigurer;
-import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import org.junit.Assert;
 import org.junit.Test;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -56,12 +51,12 @@ public class NormalizeTest extends TransformPluginsTestBase {
   private static final String PURCHASE_DATE = "PurchaseDate";
   private static final String ITEM_ID = "ItemId";
   private static final String ITEM_COST = "ItemCost";
-  private static final Schema INPUT_SCHEMA = Schema.recordOf("inputRecord",
-                                                             Schema.Field.of(CUSTOMER_ID,
+  private static final Schema SOURCE_SCHEMA = Schema.recordOf("sourceRecord",
+                                                              Schema.Field.of(CUSTOMER_ID,
                                                                              Schema.of(Schema.Type.STRING)),
-                                                             Schema.Field.of(ITEM_ID, Schema.of(Schema.Type.STRING)),
-                                                             Schema.Field.of(ITEM_COST, Schema.of(Schema.Type.LONG)),
-                                                             Schema.Field.of(PURCHASE_DATE,
+                                                              Schema.Field.of(ITEM_ID, Schema.of(Schema.Type.STRING)),
+                                                              Schema.Field.of(ITEM_COST, Schema.of(Schema.Type.FLOAT)),
+                                                              Schema.Field.of(PURCHASE_DATE,
                                                                              Schema.of(Schema.Type.STRING)));
   private static final Schema OUTPUT_SCHEMA = Schema.recordOf("outputRecord",
                                                               Schema.Field.of("Id", Schema.of(Schema.Type.STRING)),
@@ -105,7 +100,7 @@ public class NormalizeTest extends TransformPluginsTestBase {
 
 
 
-    MockPipelineConfigurer configurer = new MockPipelineConfigurer(INPUT_SCHEMA);
+    MockPipelineConfigurer configurer = new MockPipelineConfigurer(SOURCE_SCHEMA);
     new Normalize(config).configurePipeline(configurer);
     Assert.assertEquals(OUTPUT_SCHEMA, configurer.getOutputSchema());
   }
@@ -115,7 +110,7 @@ public class NormalizeTest extends TransformPluginsTestBase {
     Normalize.NormalizeConfig config = new Normalize.NormalizeConfig("CustomerId,Purchase Date:Date",
                                                                      "ItemId:AttributeType:AttributeValue, " +
                                                                        "ItemCost:AttributeType:AttributeValue");
-    MockPipelineConfigurer configurer = new MockPipelineConfigurer(INPUT_SCHEMA);
+    MockPipelineConfigurer configurer = new MockPipelineConfigurer(SOURCE_SCHEMA);
     new Normalize(config).configurePipeline(configurer);
   }
 
@@ -124,29 +119,29 @@ public class NormalizeTest extends TransformPluginsTestBase {
     Normalize.NormalizeConfig config = new Normalize.NormalizeConfig("CustomerId:Id,Purchase Date:Date",
                                                                      "ItemId:AttributeType, " +
                                                                        "ItemCost:AttributeType:AttributeValue");
-    MockPipelineConfigurer configurer = new MockPipelineConfigurer(INPUT_SCHEMA);
+    MockPipelineConfigurer configurer = new MockPipelineConfigurer(SOURCE_SCHEMA);
     new Normalize(config).configurePipeline(configurer);
   }
 
   @Test
   public void testNormalize() throws Exception {
-    String inputTable = "input_normalize_table";
+    String inputTable = "inputNormalizeTable";
     Map<String, String> sourceproperties = new ImmutableMap.Builder<String, String>()
-      .put("fieldMapping", "CustomerId:Id,Purchase Date:Date")
-      .put("fieldNormalizing", "ItemId:AttributeType:AttributeValue,ItemCost:AttributeType:AttributeValue")
+      .put("fieldMapping", CUSTOMER_ID + ":Id," + PURCHASE_DATE + ":Date")
+      .put("fieldNormalizing", ITEM_ID + ":AttributeType:AttributeValue," + ITEM_COST + ":AttributeType:AttributeValue")
       .build();
-    String outputTable = "output_normalize_table";
+    String outputTable = "outputNormalizeTable";
     ApplicationManager applicationManager = deployApplication(sourceproperties, inputTable, outputTable,
                                                               "normalizeTest");
     
     DataSetManager<Table> inputManager = getDataset(inputTable);
     List<StructuredRecord> input = ImmutableList.of(
-      StructuredRecord.builder(INPUT_SCHEMA).set(CUSTOMER_ID, "S23424242").set(ITEM_ID, "UR-AR-243123-ST")
-        .set(ITEM_COST, "245.67").set(PURCHASE_DATE, "08/09/2015").build(),
-      StructuredRecord.builder(INPUT_SCHEMA).set(CUSTOMER_ID, "S23424242").set(ITEM_ID, "SKU-234294242942")
-        .set(ITEM_COST, "67.90").set(PURCHASE_DATE, "10/12/2015").build(),
-      StructuredRecord.builder(INPUT_SCHEMA).set(CUSTOMER_ID, "R45764646").set(ITEM_ID, "SKU-567757543532")
-        .set(ITEM_COST, "14.15").set(PURCHASE_DATE, "06/09/2014").build()
+      StructuredRecord.builder(SOURCE_SCHEMA).set(ITEM_ID, "UR-AR-243123-ST").set(CUSTOMER_ID, "S23424242")
+        .set(ITEM_COST, 245.67).set(PURCHASE_DATE, "08/09/2015").build(),
+      StructuredRecord.builder(SOURCE_SCHEMA).set(ITEM_ID, "SKU-234294242942").set(CUSTOMER_ID, "S23424242")
+        .set(ITEM_COST, 67.90).set(PURCHASE_DATE, "10/12/2015").build(),
+      StructuredRecord.builder(SOURCE_SCHEMA).set(ITEM_ID, "SKU-567757543532").set(CUSTOMER_ID, "R45764646")
+        .set(ITEM_COST, 14.15).set(PURCHASE_DATE, "06/09/2014").build()
     );
     MockSource.writeInput(inputManager, input);
 

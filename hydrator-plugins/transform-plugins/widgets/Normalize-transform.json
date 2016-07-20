@@ -7,7 +7,7 @@
       "properties": [
         {
           "widget-type": "keyvalue",
-          "label": "Field Mapping",
+          "label": "Fields to be Mapped",
           "name": "fieldMapping",
           "widget-attributes": {
             "showDelimiter": "false"
@@ -15,11 +15,11 @@
         },
 	    {
           "widget-type": "ds-multiplevalues",
-          "label": "Field Normalizing",
+          "label": "Fields to be Normalized",
           "name": "fieldNormalizing",
           "widget-attributes": {
             "numValues": "3",
-            "placeholders": ["Input Field", "Attribute Type", "Attribute Value"]
+            "placeholders": ["Normalize Field", "Field Name", "Field Value"]
           }
         }
       ]
