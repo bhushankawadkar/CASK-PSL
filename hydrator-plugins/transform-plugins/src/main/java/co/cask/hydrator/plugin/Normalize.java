@@ -92,6 +92,8 @@ public class Normalize extends Transform<StructuredRecord, StructuredRecord> {
 
     for (String fieldNormalizing : fieldNormalizingArray) {
       String[] fields = fieldNormalizing.split(":");
+      Preconditions.checkArgument(mappingFieldMap.get(fields[0]) == null, "'" + fields[0] + "' cannot be use for " +
+        "both mapping as well as normalize fields.");
       Preconditions.checkArgument(validTypeField.equals(fields[1]), "Type mapping is invalid for " +
         "normalize field '" + fields[0] + "'. It must be same for all normalize fields.");
       Preconditions.checkArgument(validValueField.equals(fields[2]), "Value mapping is invalid for " +
