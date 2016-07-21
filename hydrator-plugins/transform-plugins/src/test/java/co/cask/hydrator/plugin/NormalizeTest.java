@@ -68,29 +68,31 @@ public class NormalizeTest extends TransformPluginsTestBase {
   private static final double ITEM_COST_ROW2 = 67.90;
   private static final double ITEM_COST_ROW3 = 14.15;
   private static final Map<String, Object> dataMap = new HashMap<String, Object>();
-  private static final Schema INPUT_SCHEMA = Schema.recordOf("inputRecord",
+  private static final Schema INPUT_SCHEMA = Schema.recordOf("inputSchema",
+                                                             Schema.Field.of(CUSTOMER_ID,
+                                                                             Schema.of(Schema.Type.STRING)),
                                                              Schema.Field.of(ITEM_ID,
                                                                               Schema.nullableOf(
                                                                                 Schema.of(Schema.Type.STRING))),
                                                              Schema.Field.of(ITEM_COST,
                                                                               Schema.nullableOf(
                                                                                 Schema.of(Schema.Type.DOUBLE))),
-                                                             Schema.Field.of(CUSTOMER_ID,
-                                                                             Schema.of(Schema.Type.STRING)),
                                                              Schema.Field.of(PURCHASE_DATE,
                                                                              Schema.of(Schema.Type.STRING)));
 
-  private static final Schema OUTPUT_SCHEMA = Schema.recordOf("outputRecord",
-                                                              Schema.Field.of(ATTRIBUTE_VALUE,
-                                                                              Schema.of(Schema.Type.STRING)),
+  private static final Schema OUTPUT_SCHEMA = Schema.recordOf("outputSchema",
+                                                              Schema.Field.of(ID, Schema.of(Schema.Type.STRING)),
+                                                              Schema.Field.of(DATE, Schema.of(Schema.Type.STRING)),
                                                               Schema.Field.of(ATTRIBUTE_TYPE,
                                                                               Schema.of(Schema.Type.STRING)),
-                                                              Schema.Field.of(ID, Schema.of(Schema.Type.STRING)),
-                                                              Schema.Field.of(DATE, Schema.of(Schema.Type.STRING)));
+                                                              Schema.Field.of(ATTRIBUTE_VALUE,
+                                                                              Schema.of(Schema.Type.STRING)));
 
+  private static String validFieldMapping;
+  private static String validFieldNormalizing;
 
   @BeforeClass
-  public static void initialiseDataMap() {
+  public static void initialiseData() {
     dataMap.put(CUSTOMER_ID_FIRST + PURCHASE_DATE_ROW1 + ITEM_ID, ITEM_ID_ROW1);
     dataMap.put(CUSTOMER_ID_FIRST + PURCHASE_DATE_ROW2 + ITEM_ID, ITEM_ID_ROW2);
     dataMap.put(CUSTOMER_ID_SECOND + PURCHASE_DATE_ROW3 + ITEM_ID, ITEM_ID_ROW3);
@@ -98,6 +100,10 @@ public class NormalizeTest extends TransformPluginsTestBase {
     dataMap.put(CUSTOMER_ID_FIRST + PURCHASE_DATE_ROW1 + ITEM_COST, String.valueOf(ITEM_COST_ROW1));
     dataMap.put(CUSTOMER_ID_FIRST + PURCHASE_DATE_ROW2 + ITEM_COST, String.valueOf(ITEM_COST_ROW2));
     dataMap.put(CUSTOMER_ID_SECOND + PURCHASE_DATE_ROW3 + ITEM_COST, String.valueOf(ITEM_COST_ROW3));
+
+    validFieldMapping = CUSTOMER_ID + ":" + ID + "," + PURCHASE_DATE + ":" + DATE;
+    validFieldNormalizing = ITEM_ID + ":" + ATTRIBUTE_TYPE + ":" + ATTRIBUTE_VALUE + "," + ITEM_COST + ":"
+      + ATTRIBUTE_TYPE + ":" + ATTRIBUTE_VALUE;
   }
 
   private String getKeyFromRecord(StructuredRecord record) {
@@ -130,19 +136,9 @@ public class NormalizeTest extends TransformPluginsTestBase {
     mrManager.waitForFinish(5, TimeUnit.MINUTES);
   }
 
-  private String getValidFieldNormalizing() {
-    return ITEM_ID + ":" + ATTRIBUTE_TYPE + ":" + ATTRIBUTE_VALUE + "," + ITEM_COST + ":" + ATTRIBUTE_TYPE + ":" +
-      ATTRIBUTE_VALUE;
-  }
-
-  private String getValidFieldMapping() {
-     return CUSTOMER_ID + ":" + ID + "," + PURCHASE_DATE + ":" + DATE;
-  }
-
   @Test
   public void testOutputSchema() throws Exception {
-    Normalize.NormalizeConfig config = new Normalize.NormalizeConfig(getValidFieldMapping(),
-                                                                     getValidFieldNormalizing());
+    Normalize.NormalizeConfig config = new Normalize.NormalizeConfig(validFieldMapping, validFieldNormalizing);
     MockPipelineConfigurer configurer = new MockPipelineConfigurer(INPUT_SCHEMA);
     new Normalize(config).configurePipeline(configurer);
     Assert.assertEquals(OUTPUT_SCHEMA, configurer.getOutputSchema());
@@ -151,7 +147,7 @@ public class NormalizeTest extends TransformPluginsTestBase {
   @Test(expected = IllegalArgumentException.class)
   public void testInvalidMappingValues() throws Exception {
     Normalize.NormalizeConfig config = new Normalize.NormalizeConfig("CustomerId,PurchaseDate:Date",
-                                                                     getValidFieldNormalizing());
+                                                                     validFieldNormalizing);
     MockPipelineConfigurer configurer = new MockPipelineConfigurer(INPUT_SCHEMA);
     new Normalize(config).configurePipeline(configurer);
   }
@@ -159,14 +155,14 @@ public class NormalizeTest extends TransformPluginsTestBase {
   @Test(expected = IllegalArgumentException.class)
   public void testInvalidMappingsFromInputSchema() throws Exception {
     Normalize.NormalizeConfig config = new Normalize.NormalizeConfig("Purchaser:Id,PurchaseDate:Date",
-                                                                     getValidFieldNormalizing());
+                                                                     validFieldNormalizing);
     MockPipelineConfigurer configurer = new MockPipelineConfigurer(INPUT_SCHEMA);
     new Normalize(config).configurePipeline(configurer);
   }
 
   @Test(expected = IllegalArgumentException.class)
   public void testInvalidNormalizingFromInputSchema() throws Exception {
-    Normalize.NormalizeConfig config = new Normalize.NormalizeConfig(getValidFieldMapping(),
+    Normalize.NormalizeConfig config = new Normalize.NormalizeConfig(validFieldMapping,
                                                                      "ObjectId:AttributeType:AttributeValue," +
                                                                        "ItemCost:AttributeType:AttributeValue");
     MockPipelineConfigurer configurer = new MockPipelineConfigurer(INPUT_SCHEMA);
@@ -175,7 +171,7 @@ public class NormalizeTest extends TransformPluginsTestBase {
 
   @Test(expected = IllegalArgumentException.class)
   public void testInvalidNormalizeTypeAndValue() throws Exception {
-    Normalize.NormalizeConfig config = new Normalize.NormalizeConfig(getValidFieldMapping(),
+    Normalize.NormalizeConfig config = new Normalize.NormalizeConfig(validFieldMapping,
                                                                      "ItemId:AttributeType:AttributeValue," +
                                                                        "ItemCost:ExpenseType:ExpenseValue");
     MockPipelineConfigurer configurer = new MockPipelineConfigurer(INPUT_SCHEMA);
@@ -186,8 +182,8 @@ public class NormalizeTest extends TransformPluginsTestBase {
   public void testNormalize() throws Exception {
     String inputTable = "inputNormalizeTable";
     Map<String, String> sourceproperties = new ImmutableMap.Builder<String, String>()
-      .put("fieldMapping", getValidFieldMapping())
-      .put("fieldNormalizing", getValidFieldNormalizing())
+      .put("fieldMapping", validFieldMapping)
+      .put("fieldNormalizing", validFieldNormalizing)
       .build();
     String outputTable = "outputNormalizeTable";
     ApplicationManager applicationManager = deployApplication(sourceproperties, inputTable, outputTable,
@@ -222,8 +218,8 @@ public class NormalizeTest extends TransformPluginsTestBase {
   public void testNormalizeWithEmptyAttributeValue() throws Exception {
     String inputTable = "inputNormalizeWithEmptyValueTable";
     Map<String, String> sourceproperties = new ImmutableMap.Builder<String, String>()
-      .put("fieldMapping", getValidFieldMapping())
-      .put("fieldNormalizing", getValidFieldNormalizing())
+      .put("fieldMapping", validFieldMapping)
+      .put("fieldNormalizing", validFieldNormalizing)
       .build();
     String outputTable = "outputNormalizeWithEmptyValueTable";
     ApplicationManager applicationManager = deployApplication(sourceproperties, inputTable, outputTable,
