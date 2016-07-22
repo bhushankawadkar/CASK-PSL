@@ -49,12 +49,12 @@ import java.util.concurrent.TimeUnit;
  */
 public class NormalizeTest extends TransformPluginsTestBase {
   private static final String CUSTOMER_ID = "CustomerId";
-  private static final String PURCHASE_DATE = "PurchaseDate";
   private static final String ITEM_ID = "ItemId";
   private static final String ITEM_COST = "ItemCost";
-  private static final String ATTRIBUTE_TYPE = "AttributeType";
+  private static final String PURCHASE_DATE = "PurchaseDate";
   private static final String ID = "Id";
   private static final String DATE = "Date";
+  private static final String ATTRIBUTE_TYPE = "AttributeType";
   private static final String ATTRIBUTE_VALUE = "AttributeValue";
   private static final String CUSTOMER_ID_FIRST = "S23424242";
   private static final String CUSTOMER_ID_SECOND = "R45764646";
@@ -68,25 +68,19 @@ public class NormalizeTest extends TransformPluginsTestBase {
   private static final double ITEM_COST_ROW2 = 67.90;
   private static final double ITEM_COST_ROW3 = 14.15;
   private static final Map<String, Object> dataMap = new HashMap<String, Object>();
-  private static final Schema INPUT_SCHEMA = Schema.recordOf("inputSchema",
-                                                             Schema.Field.of(CUSTOMER_ID,
-                                                                             Schema.of(Schema.Type.STRING)),
-                                                             Schema.Field.of(ITEM_ID,
-                                                                              Schema.nullableOf(
-                                                                                Schema.of(Schema.Type.STRING))),
-                                                             Schema.Field.of(ITEM_COST,
-                                                                              Schema.nullableOf(
-                                                                                Schema.of(Schema.Type.DOUBLE))),
-                                                             Schema.Field.of(PURCHASE_DATE,
-                                                                             Schema.of(Schema.Type.STRING)));
+  private static final Schema INPUT_SCHEMA =
+    Schema.recordOf("inputSchema",
+                    Schema.Field.of(CUSTOMER_ID, Schema.of(Schema.Type.STRING)),
+                    Schema.Field.of(ITEM_ID, Schema.nullableOf(Schema.of(Schema.Type.STRING))),
+                    Schema.Field.of(ITEM_COST, Schema.nullableOf(Schema.of(Schema.Type.DOUBLE))),
+                    Schema.Field.of(PURCHASE_DATE, Schema.of(Schema.Type.STRING)));
 
-  private static final Schema OUTPUT_SCHEMA = Schema.recordOf("outputSchema",
-                                                              Schema.Field.of(ID, Schema.of(Schema.Type.STRING)),
-                                                              Schema.Field.of(DATE, Schema.of(Schema.Type.STRING)),
-                                                              Schema.Field.of(ATTRIBUTE_TYPE,
-                                                                              Schema.of(Schema.Type.STRING)),
-                                                              Schema.Field.of(ATTRIBUTE_VALUE,
-                                                                              Schema.of(Schema.Type.STRING)));
+  private static final Schema OUTPUT_SCHEMA =
+    Schema.recordOf("outputSchema",
+                    Schema.Field.of(ID, Schema.of(Schema.Type.STRING)),
+                    Schema.Field.of(DATE, Schema.of(Schema.Type.STRING)),
+                    Schema.Field.of(ATTRIBUTE_TYPE, Schema.of(Schema.Type.STRING)),
+                    Schema.Field.of(ATTRIBUTE_VALUE, Schema.of(Schema.Type.STRING)));
 
   private static String validFieldMapping;
   private static String validFieldNormalizing;
@@ -138,16 +132,79 @@ public class NormalizeTest extends TransformPluginsTestBase {
 
   @Test
   public void testOutputSchema() throws Exception {
-    Normalize.NormalizeConfig config = new Normalize.NormalizeConfig(validFieldMapping, validFieldNormalizing);
+    Normalize.NormalizeConfig config = new Normalize.NormalizeConfig(validFieldMapping, validFieldNormalizing,
+                                                                     OUTPUT_SCHEMA.toString());
     MockPipelineConfigurer configurer = new MockPipelineConfigurer(INPUT_SCHEMA);
     new Normalize(config).configurePipeline(configurer);
     Assert.assertEquals(OUTPUT_SCHEMA, configurer.getOutputSchema());
   }
 
   @Test(expected = IllegalArgumentException.class)
+  public void testEmptyFieldMapping() throws Exception {
+    Normalize.NormalizeConfig config = new Normalize.NormalizeConfig(null, validFieldNormalizing,
+                                                                     OUTPUT_SCHEMA.toString());
+    MockPipelineConfigurer configurer = new MockPipelineConfigurer(INPUT_SCHEMA);
+    new Normalize(config).configurePipeline(configurer);
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testEmptyFieldNormalizing() throws Exception {
+    Normalize.NormalizeConfig config = new Normalize.NormalizeConfig(validFieldMapping, null,
+                                                                     OUTPUT_SCHEMA.toString());
+    MockPipelineConfigurer configurer = new MockPipelineConfigurer(INPUT_SCHEMA);
+    new Normalize(config).configurePipeline(configurer);
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testEmptyOutputSchema() throws Exception {
+    Normalize.NormalizeConfig config = new Normalize.NormalizeConfig(validFieldMapping, validFieldNormalizing, null);
+    MockPipelineConfigurer configurer = new MockPipelineConfigurer(INPUT_SCHEMA);
+    new Normalize(config).configurePipeline(configurer);
+  }
+
+  @Test(expected = IllegalArgumentException.class)
   public void testInvalidMappingValues() throws Exception {
     Normalize.NormalizeConfig config = new Normalize.NormalizeConfig("CustomerId,PurchaseDate:Date",
-                                                                     validFieldNormalizing);
+                                                                     validFieldNormalizing, OUTPUT_SCHEMA.toString());
+    MockPipelineConfigurer configurer = new MockPipelineConfigurer(INPUT_SCHEMA);
+    new Normalize(config).configurePipeline(configurer);
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testInvalidNormalizingValues() throws Exception {
+    Normalize.NormalizeConfig config = new Normalize.NormalizeConfig(validFieldMapping,
+                                                                     "ItemId:AttributeType," +
+                                                                       "ItemCost:AttributeType:AttributeValue",
+                                                                     OUTPUT_SCHEMA.toString());
+    MockPipelineConfigurer configurer = new MockPipelineConfigurer(INPUT_SCHEMA);
+    new Normalize(config).configurePipeline(configurer);
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testInvalidOutputSchema() throws Exception {
+    //schema with no ID field
+    Schema outputSchema =
+      Schema.recordOf("outputSchema",
+                      Schema.Field.of(DATE, Schema.of(Schema.Type.STRING)),
+                      Schema.Field.of(ATTRIBUTE_TYPE, Schema.of(Schema.Type.STRING)),
+                      Schema.Field.of(ATTRIBUTE_VALUE, Schema.of(Schema.Type.STRING)));
+    Normalize.NormalizeConfig config = new Normalize.NormalizeConfig(validFieldMapping, validFieldNormalizing,
+                                                                     outputSchema.toString());
+    MockPipelineConfigurer configurer = new MockPipelineConfigurer(INPUT_SCHEMA);
+    new Normalize(config).configurePipeline(configurer);
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testInvalidOutputSchemaFieldType() throws Exception {
+    //schema with ID field as long
+    Schema outputSchema =
+      Schema.recordOf("outputSchema",
+                      Schema.Field.of(ID, Schema.of(Schema.Type.LONG)),
+                      Schema.Field.of(DATE, Schema.of(Schema.Type.STRING)),
+                      Schema.Field.of(ATTRIBUTE_TYPE, Schema.of(Schema.Type.STRING)),
+                      Schema.Field.of(ATTRIBUTE_VALUE, Schema.of(Schema.Type.STRING)));
+    Normalize.NormalizeConfig config = new Normalize.NormalizeConfig(validFieldMapping, validFieldNormalizing,
+                                                                     outputSchema.toString());
     MockPipelineConfigurer configurer = new MockPipelineConfigurer(INPUT_SCHEMA);
     new Normalize(config).configurePipeline(configurer);
   }
@@ -155,7 +212,7 @@ public class NormalizeTest extends TransformPluginsTestBase {
   @Test(expected = IllegalArgumentException.class)
   public void testInvalidMappingsFromInputSchema() throws Exception {
     Normalize.NormalizeConfig config = new Normalize.NormalizeConfig("Purchaser:Id,PurchaseDate:Date",
-                                                                     validFieldNormalizing);
+                                                                     validFieldNormalizing, OUTPUT_SCHEMA.toString());
     MockPipelineConfigurer configurer = new MockPipelineConfigurer(INPUT_SCHEMA);
     new Normalize(config).configurePipeline(configurer);
   }
@@ -164,7 +221,8 @@ public class NormalizeTest extends TransformPluginsTestBase {
   public void testInvalidNormalizingFromInputSchema() throws Exception {
     Normalize.NormalizeConfig config = new Normalize.NormalizeConfig(validFieldMapping,
                                                                      "ObjectId:AttributeType:AttributeValue," +
-                                                                       "ItemCost:AttributeType:AttributeValue");
+                                                                       "ItemCost:AttributeType:AttributeValue",
+                                                                     OUTPUT_SCHEMA.toString());
     MockPipelineConfigurer configurer = new MockPipelineConfigurer(INPUT_SCHEMA);
     new Normalize(config).configurePipeline(configurer);
   }
@@ -173,7 +231,8 @@ public class NormalizeTest extends TransformPluginsTestBase {
   public void testInvalidNormalizeTypeAndValue() throws Exception {
     Normalize.NormalizeConfig config = new Normalize.NormalizeConfig(validFieldMapping,
                                                                      "ItemId:AttributeType:AttributeValue," +
-                                                                       "ItemCost:ExpenseType:ExpenseValue");
+                                                                       "ItemCost:ExpenseType:ExpenseValue",
+                                                                     OUTPUT_SCHEMA.toString());
     MockPipelineConfigurer configurer = new MockPipelineConfigurer(INPUT_SCHEMA);
     new Normalize(config).configurePipeline(configurer);
   }
@@ -184,6 +243,7 @@ public class NormalizeTest extends TransformPluginsTestBase {
     Map<String, String> sourceproperties = new ImmutableMap.Builder<String, String>()
       .put("fieldMapping", validFieldMapping)
       .put("fieldNormalizing", validFieldNormalizing)
+      .put("outputSchema", OUTPUT_SCHEMA.toString())
       .build();
     String outputTable = "outputNormalizeTable";
     ApplicationManager applicationManager = deployApplication(sourceproperties, inputTable, outputTable,
@@ -220,6 +280,7 @@ public class NormalizeTest extends TransformPluginsTestBase {
     Map<String, String> sourceproperties = new ImmutableMap.Builder<String, String>()
       .put("fieldMapping", validFieldMapping)
       .put("fieldNormalizing", validFieldNormalizing)
+      .put("outputSchema", OUTPUT_SCHEMA.toString())
       .build();
     String outputTable = "outputNormalizeWithEmptyValueTable";
     ApplicationManager applicationManager = deployApplication(sourceproperties, inputTable, outputTable,
